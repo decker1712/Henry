@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini 3D Prints Shop</title>
+<style>
+  :root{
+    --accent:#0b74de; --muted:#777; --card:#fff; --bg:#f5f7fb;
+    --maxw:1100px;
+    font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+  }
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:#0b2030;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  header{
+    width:100%; background:#fff; box-shadow:0 1px 4px rgba(10,20,30,.06);
+    position:sticky; top:0; z-index:30;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:18px; display:flex; gap:12px; align-items:center; justify-content:space-between;}
+  .brand{display:flex; gap:12px; align-items:center;}
+  .logo{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#6cc5ff); border-radius:8px; display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+  .search{flex:1; margin-left:12px;}
+  .search input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #e3e7ee}
+  .actions{display:flex; gap:10px; align-items:center;}
+  .btn{background:var(--accent); color:#fff; padding:8px 12px;border-radius:8px;text-decoration:none;display:inline-block}
+  .ghost{background:transparent;color:var(--accent);border:1px solid rgba(11,116,222,.12);padding:8px 10px;border-radius:8px}
+  main{max-width:var(--maxw); width:100%; padding:28px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;}
+  .card{background:var(--card); padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(12,20,40,.04); display:flex;flex-direction:column;}
+  .thumb{height:160px; border-radius:8px; background:#eee; display:block; object-fit:cover; width:100%}
+  .title{font-weight:600;margin:8px 0 4px;font-size:15px}
+  .price{font-weight:700;color:var(--accent); margin-bottom:6px}
+  .meta{color:var(--muted); font-size:13px; margin-bottom:8px}
+  .card .cta{margin-top:auto; display:flex; gap:8px}
+  .qty{display:inline-flex; gap:6px; align-items:center}
+  footer{width:100%; padding:18px 0; color:var(--muted); font-size:13px; text-align:center}
+  /* modal */
+  .modal-bg{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(8,12,20,.45); z-index:80}
+  .modal{width:92%; max-width:900px; background:#fff; border-radius:10px; padding:16px; display:grid; grid-template-columns:1fr 320px; gap:14px}
+  .modal .large-img{width:100%; height:360px; object-fit:contain; background:#fafafa; border-radius:8px}
+  .close{position:absolute; right:12px; top:12px; cursor:pointer}
+  .cart-btn{position:fixed; right:18px; bottom:18px; z-index:90}
+  .cart-panel{position:fixed; right:18px; bottom:72px; width:360px; max-height:70vh; overflow:auto; background:#fff; padding:12px; border-radius:10px; box-shadow:0 20px 40px rgba(2,12,28,.2)}
+  .cart-item{display:flex; gap:10px; align-items:center; border-bottom:1px solid #f1f3f7; padding:10px 0}
+  .small-thumb{width:56px;height:56px;border-radius:6px;object-fit:cover}
+  .muted{color:var(--muted)}
+  /* responsive */
+  @media (max-width:880px){
+    .modal{grid-template-columns:1fr}
+    .modal .large-img{height:260px}
+    .wrap{padding:12px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo">3D</div>
+      <div>
+        <div style="font-weight:700">Mini Maker Shop</div>
+        <div style="font-size:12px;color:var(--muted)">3D-printed goods & accessories</div>
+      </div>
+    </div>
+
+    <div class="search" style="max-width:520px">
+      <input id="search" placeholder="Search products (e.g. vase, holder, tool)" />
+    </div>
+
+    <div class="actions">
+      <a class="ghost" id="view-stock">Stock: <span id="stock-count">0</span></a>
+      <a class="btn" id="open-cart">Cart (<span id="cart-count">0</span>)</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h1 style="margin:0">Products</h1>
+    <div class="muted">Made for BambuLab prints — sizes shown in mm</div>
+  </section>
+
+  <section class="grid" id="product-grid">
+    <!-- product cards injected here -->
+  </section>
+</main>
+
+<!-- modal product detail -->
+<div class="modal-bg" id="modal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div>
+      <img id="modal-img" class="large-img" src="" alt="product image"/>
+    </div>
+    <div>
+      <button class="close" id="close-modal" title="Close">✕</button>
+      <h2 id="modal-title"></h2>
+      <div class="muted" id="modal-dims"></div>
+      <p id="modal-desc" style="margin-top:10px"></p>
+      <div style="margin-top:12px">
+        <div class="price" id="modal-price"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <label>Qty</label>
+          <input id="modal-qty" value="1" min="1" type="number" style="width:70px;padding:6px;border-radius:6px;border:1px solid #e6ecf7"/>
+        </div>
+      </div>
+      <div style="margin-top:18px">
+        <a class="btn" id="modal-add">Add to cart</a>
+        <a class="ghost" id="modal-close-2" style="margin-left:8px">Close</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- cart floating -->
+<div class="cart-btn">
+  <a class="btn" id="open-cart-2">Open cart</a>
+</div>
+<div class="cart-panel" id="cart-panel" style="display:none">
+  <h3 style="margin:0 0 8px">Cart</h3>
+  <div id="cart-list"></div>
+  <div style="display:flex;justify-content:space-between;margin-top:12px">
+    <div class="muted">Subtotal</div><div id="subtotal">£0.00</div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <a class="btn" id="checkout">Checkout</a>
+    <a class="ghost" id="clear-cart">Clear</a>
+  </div>
+</div>
+
+<footer>
+  Built for learning — demo checkout only. Images are placeholders.
+</footer>
+
+<script>
+/* PRODUCTS - edit sizes/prices/descriptions here.
+   Each product has id, title, price (GBP), dims {w,l,h in mm}, img, stock.
+*/
+const products = [
+  {id:'p1', title:'Mini Tool Caddy', price:6.50, dims:{w:120,l:80,h:90}, img:'https://via.placeholder.com/600x400?text=Tool+Caddy', stock:50, desc:'Handy organizer for nozzles, screws and small parts.'},
+  {id:'p2', title:'Phone Stand (angled)', price:4.75, dims:{w:95,l:80,h:70}, img:'https://via.placeholder.com/600x400?text=Phone+Stand', stock:120, desc:'Compact angled phone stand – perfect for timelapse monitoring.'},
+  {id:'p3', title:'Large Planter (hollow)', price:12.99, dims:{w:150,l:150,h:120}, img:'https://via.placeholder.com/600x400?text=Planter', stock:20, desc:'Decorative planter – printed hollow to save material.'},
+  {id:'p4', title:'Flexible Cable Clips (10 pack)', price:3.99, dims:{w:90,l:40,h:20}, img:'https://via.placeholder.com/600x400?text=Cable+Clips', stock:200, desc:'Bundle of 10 cable clips for neat desk routing.'},
+  {id:'p5', title:'Articulated Robot Arm (kit)', price:29.50, dims:{w:260,l:80,h:190}, img:'https://via.placeholder.com/600x400?text=Robot+Arm', stock:6, desc:'Multi-part robot arm (ships in kit form). Large, needs bigger packaging.'}
+];
+
+// --- helpers for currency ---
+const fmt = v => '£' + v.toFixed(2);
+
+// cart stored in localStorage as map id -> qty
+let cart = JSON.parse(localStorage.getItem('mini_shop_cart')||'{}');
+
+function saveCart(){ localStorage.setItem('mini_shop_cart', JSON.stringify(cart)); updateCartUI(); }
+
+// build product grid
+function renderProducts(filter=''){
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = '';
+  const list = products.filter(p => p.title.toLowerCase().includes(filter.toLowerCase()) || p.desc.toLowerCase().includes(filter.toLowerCase()));
+  list.forEach(p=>{
+    const el = document.createElement('div'); el.className='card';
+    el.innerHTML = `
+      <img class="thumb" src="${p.img}" alt="${p.title}">
+      <div class="title">${p.title}</div>
+      <div class="meta">Size: ${p.dims.w}×${p.dims.l}×${p.dims.h} mm</div>
+      <div class="price">${fmt(p.price)}</div>
+      <div style="display:flex;gap:8px;align-items:center" class="cta">
+        <a class="btn" data-id="${p.id}" href="#" onclick="openModal(event,'${p.id}')">View</a>
+        <a class="ghost" href="#" onclick="quickAdd(event,'${p.id}')">+ Add</a>
+      </div>
+    `;
+    grid.appendChild(el);
+  });
+  document.getElementById('stock-count').textContent = products.reduce((s,p)=>s+p.stock,0);
+}
+
+// modal controls
+const modalBg = document.getElementById('modal');
+function openModal(e,id){
+  if(e) e.preventDefault();
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('modal-img').src = p.img;
+  document.getElementById('modal-title').textContent = p.title;
+  document.getElementById('modal-desc').textContent = p.desc;
+  document.getElementById('modal-dims').textContent = `Dimensions: ${p.dims.w}×${p.dims.l}×${p.dims.h} mm`;
+  document.getElementById('modal-price').textContent = fmt(p.price);
+  document.getElementById('modal-qty').value = 1;
+  document.getElementById('modal-add').setAttribute('data-id', p.id);
+  modalBg.style.display = 'flex';
+}
+document.getElementById('close-modal').onclick = ()=>modalBg.style.display='none';
+document.getElementById('modal-close-2').onclick = ()=>modalBg.style.display='none';
+
+// quick add
+function quickAdd(e,id){
+  e && e.preventDefault();
+  cart[id] = (cart[id]||0) + 1;
+  saveCart();
+  animateCartCount();
+}
+
+// add from modal
+document.getElementById('modal-add').onclick = (ev)=>{
+  const id = ev.target.getAttribute('data-id');
+  const qty = parseInt(document.getElementById('modal-qty').value)||1;
+  cart[id] = (cart[id]||0) + qty;
+  saveCart();
+  modalBg.style.display='none';
+  animateCartCount();
+}
+
+// cart UI
+function updateCartUI(){
+  const count = Object.values(cart).reduce((s,n)=>s+n,0);
+  document.getElementById('cart-count').textContent = count;
+  const listEl = document.getElementById('cart-list'); listEl.innerHTML = '';
+  let subtotal = 0;
+  for(const [id,qty] of Object.entries(cart)){
+    const p = products.find(x=>x.id===id);
+    if(!p) continue;
+    const row = document.createElement('div'); row.className='cart-item';
+    const total = p.price * qty; subtotal += total;
+    row.innerHTML = `
+      <img class="small-thumb" src="${p.img}" alt="${p.title}">
+      <div style="flex:1">
+        <div style="font-weight:600">${p.title}</div>
+        <div class="muted" style="font-size:13px">${fmt(p.price)} × ${qty} = ${fmt(total)}</div>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center">
+          <input data-id="${id}" class="cart-qty" type="number" min="0" value="${qty}" style="width:70px;padding:6px;border-radius:6px;border:1px solid #e6ecf7"/>
+          <a href="#" data-id="${id}" class="ghost remove">Remove</a>
+        </div>
+      </div>
+    `;
+    listEl.appendChild(row);
+  }
+  document.getElementById('subtotal').textContent = fmt(subtotal);
+  document.querySelectorAll('.remove').forEach(btn=>{
+    btn.onclick = (e)=>{ e.preventDefault(); const id = btn.getAttribute('data-id'); delete cart[id]; saveCart(); };
+  });
+  document.querySelectorAll('.cart-qty').forEach(input=>{
+    input.onchange = ()=>{ const id = input.getAttribute('data-id'); const v = parseInt(input.value)||0; if(v<=0) delete cart[id]; else cart[id]=v; saveCart(); };
+  });
+}
+
+// open/close cart panel
+document.getElementById('open-cart').onclick = ()=>{
+  const panel = document.getElementById('cart-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+};
+document.getElementById('open-cart-2').onclick = ()=>document.getElementById('open-cart').click();
+document.getElementById('clear-cart').onclick = ()=>{
+  cart = {}; saveCart();
+};
+
+// checkout mock
+document.getElementById('checkout').onclick = ()=>{
+  if(Object.keys(cart).length===0){ alert('Your cart is empty'); return; }
+  // In a real store you'd send order data to backend / payment provider.
+  alert('Demo checkout: order placed (mock). Clear cart to simulate dispatch.');
+  cart={}; saveCart();
+};
+
+// search
+document.getElementById('search').oninput = (e)=> renderProducts(e.target.value);
+
+// small animation for cart count
+function animateCartCount(){
+  const el = document.getElementById('cart-count');
+  el.style.transform='scale(1.25)';
+  setTimeout(()=>el.style.transform='scale(1)',220);
+}
+
+// initial render
+renderProducts();
+updateCartUI();
+</script>
+</body>
+</html>
+
+<meta name="google-site-verification" content="fXjKUx7S4kJOAniy16ESuoIOyB5WaUtKMOCQFTiEz6w" />
